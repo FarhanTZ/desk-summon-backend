@@ -1,0 +1,23 @@
+# Environment variables & secrets
+.env
+*.env.local
+
+# Binaries / Executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+desk-summon-backend
+bin/
+dist/
+
+# Test binary, output & coverage
+*.test
+*.out
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*~
