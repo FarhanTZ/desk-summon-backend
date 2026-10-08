@@ -38,7 +38,17 @@ func main() {
 		log.Fatal("Error: SUPABASE_URL atau SUPABASE_ANON_KEY belum diisi di .env")
 	}
 
-	// 2. Inisialisasi Supabase Client
+	// 2. Jalankan Migrasi Database Otomatis (DDL)
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL != "" {
+		if err := RunMigrations(dbURL); err != nil {
+			log.Printf("⚠️ Peringatan Migrasi: %v", err)
+		}
+	} else {
+		log.Println("ℹ️ DATABASE_URL tidak disetel di .env, melewati auto-migration.")
+	}
+
+	// 3. Inisialisasi Supabase Client
 	client, err := supabase.NewClient(supabaseURL, supabaseKey, nil)
 	if err != nil {
 		log.Fatalf("Gagal inisialisasi Supabase: %v", err)
