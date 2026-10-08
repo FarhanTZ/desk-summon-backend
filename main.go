@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -46,7 +47,8 @@ func main() {
 	fmt.Println("🚀 Daemon Desk Summon aktif...")
 	fmt.Println("Menunggu perintah dari HP (current_session)...")
 
-	var lastHandledState string = "IDLE"
+	var lastHandledState string = ""
+	var lastHandledTopic string = ""
 
 	// 3. Polling loop (cek setiap 2 detik)
 	for {
@@ -64,38 +66,48 @@ func main() {
 			continue
 		}
 
-		// Deteksi jika state berubah ke FOCUSING
-		if session.State == "FOCUSING" && lastHandledState != "FOCUSING" {
-			fmt.Printf("\n⚡ Perintah diterima! Topik: %v\n", ptrToString(session.Topic))
+		currentTopic := ptrToString(session.Topic)
 
-			// Default path jika kosong (fallback ke direktori kerja saat ini)
-			targetPath := "."
-			if session.ProjectPath != nil && *session.ProjectPath != "" {
-				targetPath = *session.ProjectPath
-			}
+		// Deteksi jika state FOCUSING (baik baru berubah ke FOCUSING, atau topik baru dikirim saat FOCUSING)
+		if session.State == "FOCUSING" {
+			if lastHandledState != "FOCUSING" || (currentTopic != "-" && currentTopic != lastHandledTopic) {
+				fmt.Printf("\n⚡ Perintah diterima! Topik: %s\n", currentTopic)
 
-			// Buka VS Code
-			if err := openVSCode(targetPath); err != nil {
-				log.Printf("Gagal membuka VS Code: %v", err)
-			} else {
-				fmt.Printf("✅ VS Code berhasil dibuka pada: %s\n", targetPath)
-			}
-
-			// Buka Dokumentasi di browser jika ada
-			if session.DocURL != nil && *session.DocURL != "" {
-				if err := openBrowser(*session.DocURL); err != nil {
-					log.Printf("Gagal membuka browser: %v", err)
-				} else {
-					fmt.Printf("🌐 Browser dibuka: %s\n", *session.DocURL)
+				// Buka VS Code hanya jika ada project path
+				if session.ProjectPath != nil && *session.ProjectPath != "" {
+					targetPath := *session.ProjectPath
+					if err := openVSCode(targetPath); err != nil {
+						log.Printf("Gagal membuka VS Code: %v", err)
+					} else {
+						fmt.Printf("✅ VS Code berhasil dibuka pada: %s\n", targetPath)
+					}
 				}
-			}
 
-			lastHandledState = "FOCUSING"
+				// Buka URL / Browser jika ada (bisa multiple URL dipisahkan koma)
+				if session.DocURL != nil && *session.DocURL != "" {
+					rawURLs := strings.Split(*session.DocURL, ",")
+					for _, u := range rawURLs {
+						cleanURL := strings.TrimSpace(u)
+						if cleanURL != "" {
+							if err := openBrowser(cleanURL); err != nil {
+								log.Printf("Gagal membuka browser (%s): %v", cleanURL, err)
+							} else {
+								fmt.Printf("🌐 Browser dibuka: %s\n", cleanURL)
+							}
+							time.Sleep(300 * time.Millisecond)
+						}
+					}
+				}
+
+				lastHandledState = "FOCUSING"
+				lastHandledTopic = currentTopic
+			}
 		} else if session.State == "IDLE" || session.State == "SURRENDERED" {
 			if lastHandledState == "FOCUSING" {
 				fmt.Printf("🛑 Sesi selesai/berubah menjadi: %s\n", session.State)
 			}
 			lastHandledState = session.State
+			lastHandledTopic = ""
 		}
 
 		time.Sleep(2 * time.Second)
